@@ -105,20 +105,39 @@ function draw() {
   context.lineWidth = 2;
   let yForIndex = index => height - ((index - toneScroll + 1) * toneHeight);
 
+  // Beat background
   for (let {index, key} of tones) {
     let y = yForIndex(index);
     context.fillStyle = isBlackKey(key) ? '#ddd' : '#eee';
     context.fillRect(0, y, width, toneHeight);
   }
 
+  // Tone separating lines
+  for (let {index, key} of tones) {
+    let y = yForIndex(index);
+    let x = -beatScroll * beatWidth;
+    if (key == 11) {
+      context.setLineDash([]);
+      context.strokeStyle = '#444';
+      drawLine(x, y, width, y);
+    } else if (key == 4) {
+      context.setLineDash([8, 7]);
+      context.strokeStyle = '#999';
+      drawLine(x, y, width, y);
+    }
+  }
+
+  // Beat separating lines
   const visualBeatCount = Math.floor((width - toneWidth)/ beatWidth);
   for (let i of range(visualBeatCount)) {
     let x = toneWidth + i * beatWidth;
     let isBar = (i + beatScroll) % 4 == 0;
+    context.setLineDash([]);
     context.strokeStyle = isBar ? '#999' : '#bbb';
     drawLine(x, 0, x, height);
   }
 
+  // Tone keyboard
   for (let {index, key} of tones) {
     let y = yForIndex(index);
 
@@ -127,16 +146,6 @@ function draw() {
     context.strokeRect(0, y, toneWidth, toneHeight);
     context.fillStyle = isBlackKey(key) ? 'black' : 'white';
     context.fillRect(0, y, toneWidth, toneHeight);
-
-    if (key == 11) {
-      context.setLineDash([]);
-      context.strokeStyle = '#444';
-      drawLine(toneWidth, y, width, y);
-    } else if (key == 4) {
-      context.setLineDash([8, 7]);
-      context.strokeStyle = '#999';
-      drawLine(toneWidth, y, width, y);
-    }
   }
 }
 
