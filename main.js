@@ -13,33 +13,34 @@ let audioContext = new AudioContext();
 
 let masterGain = (() => {
   let gain = audioContext.createGain();
-  gain.gain.setValueAtTime(0.5, 0);
+  gain.gain.setValueAtTime(1, 0);
   gain.connect(audioContext.destination);
   return gain;
 })();
 
-let toneGains = range(toneCount).map(tone => {
+let tones = range(toneCount).map(index => {
+  let frequency = indexToFrequency(index);
   let oscillator = audioContext.createOscillator();
-  oscillator.frequency.setValueAtTime(toneToFrequency(tone), 0);
+  oscillator.frequency.setValueAtTime(frequency, 0);
   let gain = audioContext.createGain();
-  gain.gain.setValueAtTime(0, 0);
+  let gainKnob = gain.gain;
+  gainKnob.setValueAtTime(0, 0);
   oscillator.connect(gain);
   gain.connect(masterGain);
   oscillator.start(0);
-  return gain;
+  let timeline = [];
+  return {frequency, gainKnob, timeline};
 });
-
-let toneTimelines = range(toneCount).map(tone => []);
 
 
 function main() {
   canvas = document.getElementById('canvas');
   context = canvas.getContext('2d');
   resize();
-  toneTimelines[60] = [{beat: 0, gain: 1}, {beat: 1, gain: 0}];
-  toneTimelines[64] = [{beat: 1, gain: 1}, {beat: 2, gain: 0}];
-  toneTimelines[67] = [{beat: 2, gain: 1}, {beat: 3, gain: 0}];
-  toneTimelines[70] = [{beat: 3, gain: 1}, {beat: 4, gain: 0}];
+  tones[60].timeline = [{beat: 0, gain: 1}, {beat: 1, gain: 0}];
+  tones[64].timeline = [{beat: 1, gain: 1}, {beat: 2, gain: 0}];
+  tones[67].timeline = [{beat: 2, gain: 1}, {beat: 3, gain: 0}];
+  tones[70].timeline = [{beat: 3, gain: 1}, {beat: 4, gain: 0}];
   scheduleToneGains({startingBeat: 0});
 }
 
@@ -54,17 +55,16 @@ function range(n) {
 function scheduleToneGains({startingBeat}) {
   let currentTime = audioContext.currentTime;
   let secondsPerBeat = 60 / beatsPerMinute;
-  range(toneCount).forEach(tone => {
-    let timeline = toneTimelines[tone];
-    let toneGain = toneGains[tone];
-    toneGain.gain.cancelScheduledValues(0);
-    toneGain.gain.setValueAtTime(0, 0);
+  tones.forEach(({gainKnob, timeline}) => {
+    gainKnob.cancelScheduledValues(0);
+    gainKnob.setValueAtTime(0, 0);
     let prevGain = 0;
     for (let {beat, gain} of timeline) {
       if (beat >= startingBeat) {
         let beatTime = currentTime + (beat - startingBeat) * secondsPerBeat;
         let toneSmoothing = gain > prevGain ? toneSmoothingUp : toneSmoothingDown;
-        toneGain.gain.setTargetAtTime(gain, beatTime, toneSmoothing);
+        gainKnob.setTargetAtTime(gain, beatTime, toneSmoothing);
+        prevGain = gain;
       }
     }
   });
@@ -77,7 +77,7 @@ function resize() {
   canvas.height = height;
 }
 
-function toneToFrequency(tone) {
+function indexToFrequency(tone) {
   console.assert(tone >= 0 && tone < toneCount);
   // 60: Middle C
   // 69: Concert A
