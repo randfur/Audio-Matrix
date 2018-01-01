@@ -45,10 +45,10 @@ let tones = range(toneCount).map(index => {
 });
 
 
-function main() {
+function loadEvent() {
   canvas = document.getElementById('canvas');
   context = canvas.getContext('2d');
-  resize();
+  resizeEvent();
 }
 
 function range(n) {
@@ -76,7 +76,7 @@ function scheduleToneGains({startingBeat, tone=null}) {
   });
 }
 
-function resize() {
+function resizeEvent() {
   width = window.innerWidth;
   height = window.innerHeight;
   canvas.width = width;
@@ -140,5 +140,16 @@ function draw() {
   }
 }
 
-window.addEventListener('load', main);
-window.addEventListener('resize', resize);
+function scrollEvent({clientX:mouseX, deltaY}) {
+  deltaY /= Math.abs(deltaY);
+  if (mouseX <= toneWidth) {
+    toneScroll = Math.max(0, Math.min(toneCount - (height / toneHeight), toneScroll - 3 * deltaY));
+  } else {
+    beatScroll = Math.max(0, beatScroll + deltaY);
+  }
+  draw();
+}
+
+window.addEventListener('load', loadEvent);
+window.addEventListener('resize', resizeEvent);
+window.addEventListener('mousewheel', scrollEvent);
