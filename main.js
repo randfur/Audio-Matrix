@@ -18,30 +18,29 @@ let beatWidth = 50;
 let beatScroll = 0;
 
 let audioContext = new AudioContext();
-let masterGain = (() => {
+
+let masterGainNode = (() => {
   let gain = audioContext.createGain();
   gain.gain.setValueAtTime(1, 0);
   gain.connect(audioContext.destination);
   return gain;
 })();
+
 let tones = range(toneCount).map(index => {
-  let key = index % 12;
-  let frequency = indexToFrequency(index);
   let oscillator = audioContext.createOscillator();
+  let frequency = indexToFrequency(index);
   oscillator.frequency.setValueAtTime(frequency, 0);
-  let gain = audioContext.createGain();
-  let gainKnob = gain.gain;
-  gainKnob.setValueAtTime(0, 0);
-  oscillator.connect(gain);
-  gain.connect(masterGain);
   oscillator.start(0);
-  let timeline = [];
+  let gainNode = audioContext.createGain();
+  gainNode.gain.setValueAtTime(0, 0);
+  oscillator.connect(gainNode);
+  gainNode.connect(masterGainNode);
   return {
     index,
-    key,
+    key: index % 12,
     frequency,
-    gainKnob,
-    timeline,
+    gainKnob: gainNode.gain,
+    timeline: [],
   };
 });
 
@@ -95,13 +94,33 @@ function isBlackKey(key) {
   return [1, 3, 6, 8, 10].some(x => key == x);
 }
 
+function drawLine(x1, y1, x2, y2) {
+  context.beginPath();
+  context.moveTo(x1, y1);
+  context.lineTo(x2, y2);
+  context.stroke();
+}
+
 function draw() {
   context.lineWidth = 2;
-  for (let {index, key} of tones) {
-    let y = height - ((index - toneScroll + 1) * toneHeight);
+  let yForIndex = index => height - ((index - toneScroll + 1) * toneHeight);
 
+  for (let {index, key} of tones) {
+    let y = yForIndex(index);
     context.fillStyle = isBlackKey(key) ? '#ddd' : '#eee';
     context.fillRect(0, y, width, toneHeight);
+  }
+
+  const visualBeatCount = Math.floor((width - toneWidth)/ beatWidth);
+  for (let i of range(visualBeatCount)) {
+    let x = toneWidth + i * beatWidth;
+    let isBar = (i + beatScroll) % 4 == 0;
+    context.strokeStyle = isBar ? '#999' : '#bbb';
+    drawLine(x, 0, x, height);
+  }
+
+  for (let {index, key} of tones) {
+    let y = yForIndex(index);
 
     context.strokeStyle = 'black';
     context.setLineDash([]);
@@ -109,13 +128,14 @@ function draw() {
     context.fillStyle = isBlackKey(key) ? 'black' : 'white';
     context.fillRect(0, y, toneWidth, toneHeight);
 
-    if (key == 11 || key == 4) {
-      context.setLineDash(key == 4 ? [10, 10] : []);
+    if (key == 11) {
+      context.setLineDash([]);
       context.strokeStyle = '#444';
-      context.beginPath();
-      context.moveTo(toneWidth, y);
-      context.lineTo(width, y);
-      context.stroke();
+      drawLine(toneWidth, y, width, y);
+    } else if (key == 4) {
+      context.setLineDash([8, 7]);
+      context.strokeStyle = '#999';
+      drawLine(toneWidth, y, width, y);
     }
   }
 }
