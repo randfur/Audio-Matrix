@@ -2,17 +2,44 @@
 
 let canvas = document.getElementById('canvas');
 let context = canvas.getContext('2d');
-let toneCount = 128;
 let width = 0;
 let height = 0;
+let toneCount = 128;
+let beatsPerMinute = 120;
+let beatsPerBar = 4;
+let toneSmoothingUp = 0.008;
+let toneSmoothingDown = 0.02;
 let audioContext = new AudioContext();
-let toneGains = createToneGains();
+
+let masterGain = (() => {
+  let gain = audioContext.createGain();
+  gain.gain.setValueAtTime(0.5, 0);
+  gain.connect(audioContext.destination);
+  return gain;
+})();
+
+let toneGains = range(toneCount).map(tone => {
+  let oscillator = audioContext.createOscillator();
+  oscillator.frequency.setValueAtTime(toneToFrequency(tone), 0);
+  let gain = audioContext.createGain();
+  gain.gain.setValueAtTime(0, 0);
+  oscillator.connect(gain);
+  gain.connect(masterGain);
+  oscillator.start(0);
+  return gain;
+});
+
+let toneTimelines = range(toneCount).map(tone => []);
 
 
 function main() {
   resize();
-  toneGains[67].gain.setValueAtTime(0.5, 0);
-  toneGains[67].gain.setValueAtTime(0, 1);
+  toneTimelines[60] = [{beat: 0, gain: 1}, {beat: 1, gain: 0}, {beat: 4, gain: 1}, {beat: 5, gain: 0}];
+  toneTimelines[65] = [{beat: 1, gain: 1}, {beat: 2, gain: 0}, {beat: 5, gain: 1}, {beat: 6, gain: 0}];
+  toneTimelines[67] = [{beat: 2, gain: 1}, {beat: 3, gain: 0}, {beat: 6, gain: 1}, {beat: 7, gain: 0}];
+  toneTimelines[71] = [{beat: 7, gain: 1}, {beat: 8, gain: 0}];
+  toneTimelines[72] = [{beat: 3, gain: 1}, {beat: 4, gain: 0}];
+  scheduleToneGains({startingBeat: 0});
 }
 
 function range(n) {
@@ -23,16 +50,22 @@ function range(n) {
   return result;
 }
 
-function createToneGains() {
-  return range(toneCount).map(tone => {
-    let oscillator = audioContext.createOscillator();
-    oscillator.frequency.setValueAtTime(toneToFrequency(tone), 0);
-    let gain = audioContext.createGain();
-    gain.gain.setValueAtTime(0, 0);
-    oscillator.connect(gain);
-    gain.connect(audioContext.destination);
-    oscillator.start(0);
-    return gain;
+function scheduleToneGains({startingBeat}) {
+  let currentTime = audioContext.currentTime;
+  let secondsPerBeat = 60 / beatsPerMinute;
+  range(toneCount).forEach(tone => {
+    let timeline = toneTimelines[tone];
+    let toneGain = toneGains[tone];
+    toneGain.gain.cancelScheduledValues(0);
+    toneGain.gain.setValueAtTime(0, 0);
+    let prevGain = 0;
+    for (let {beat, gain} of timeline) {
+      if (beat >= startingBeat) {
+        let beatTime = currentTime + (beat - startingBeat) * secondsPerBeat;
+        let toneSmoothing = gain > prevGain ? toneSmoothingUp : toneSmoothingDown;
+        toneGain.gain.setTargetAtTime(gain, beatTime, toneSmoothing);
+      }
+    }
   });
 }
 
