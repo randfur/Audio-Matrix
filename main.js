@@ -1,7 +1,7 @@
 'use strict';
 
-let canvas = document.getElementById('canvas');
-let context = canvas.getContext('2d');
+let canvas = null;
+let context = null;
 let width = 0;
 let height = 0;
 let toneCount = 128;
@@ -33,12 +33,13 @@ let toneTimelines = range(toneCount).map(tone => []);
 
 
 function main() {
+  canvas = document.getElementById('canvas');
+  context = canvas.getContext('2d');
   resize();
-  toneTimelines[60] = [{beat: 0, gain: 1}, {beat: 1, gain: 0}, {beat: 4, gain: 1}, {beat: 5, gain: 0}];
-  toneTimelines[65] = [{beat: 1, gain: 1}, {beat: 2, gain: 0}, {beat: 5, gain: 1}, {beat: 6, gain: 0}];
-  toneTimelines[67] = [{beat: 2, gain: 1}, {beat: 3, gain: 0}, {beat: 6, gain: 1}, {beat: 7, gain: 0}];
-  toneTimelines[71] = [{beat: 7, gain: 1}, {beat: 8, gain: 0}];
-  toneTimelines[72] = [{beat: 3, gain: 1}, {beat: 4, gain: 0}];
+  toneTimelines[60] = [{beat: 0, gain: 1}, {beat: 1, gain: 0}];
+  toneTimelines[64] = [{beat: 1, gain: 1}, {beat: 2, gain: 0}];
+  toneTimelines[67] = [{beat: 2, gain: 1}, {beat: 3, gain: 0}];
+  toneTimelines[70] = [{beat: 3, gain: 1}, {beat: 4, gain: 0}];
   scheduleToneGains({startingBeat: 0});
 }
 
