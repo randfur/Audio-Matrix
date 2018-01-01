@@ -4,21 +4,28 @@ let canvas = null;
 let context = null;
 let width = 0;
 let height = 0;
+
 let toneCount = 128;
+let toneHeight = 14;
+let toneWidth = 100;
+let toneScroll = 0;
+let toneSmoothingOn = 0.01;
+let toneSmoothingOff = 0.04;
+
 let beatsPerMinute = 120;
 let beatsPerBar = 4;
-let toneSmoothingUp = 0.008;
-let toneSmoothingDown = 0.02;
-let audioContext = new AudioContext();
+let beatWidth = 50;
+let beatScroll = 0;
 
+let audioContext = new AudioContext();
 let masterGain = (() => {
   let gain = audioContext.createGain();
   gain.gain.setValueAtTime(1, 0);
   gain.connect(audioContext.destination);
   return gain;
 })();
-
 let tones = range(toneCount).map(index => {
+  let key = index % 12;
   let frequency = indexToFrequency(index);
   let oscillator = audioContext.createOscillator();
   oscillator.frequency.setValueAtTime(frequency, 0);
@@ -29,7 +36,13 @@ let tones = range(toneCount).map(index => {
   gain.connect(masterGain);
   oscillator.start(0);
   let timeline = [];
-  return {frequency, gainKnob, timeline};
+  return {
+    index,
+    key,
+    frequency,
+    gainKnob,
+    timeline,
+  };
 });
 
 
@@ -37,11 +50,6 @@ function main() {
   canvas = document.getElementById('canvas');
   context = canvas.getContext('2d');
   resize();
-  tones[60].timeline = [{beat: 0, gain: 1}, {beat: 1, gain: 0}];
-  tones[64].timeline = [{beat: 1, gain: 1}, {beat: 2, gain: 0}];
-  tones[67].timeline = [{beat: 2, gain: 1}, {beat: 3, gain: 0}];
-  tones[70].timeline = [{beat: 3, gain: 1}, {beat: 4, gain: 0}];
-  scheduleToneGains({startingBeat: 0});
 }
 
 function range(n) {
@@ -52,19 +60,18 @@ function range(n) {
   return result;
 }
 
-function scheduleToneGains({startingBeat}) {
+function scheduleToneGains({startingBeat, tone=null}) {
   let currentTime = audioContext.currentTime;
   let secondsPerBeat = 60 / beatsPerMinute;
-  tones.forEach(({gainKnob, timeline}) => {
+  let schedulingTones = tone ? [tone] : tones;
+  schedulingTones.forEach(({gainKnob, timeline}) => {
     gainKnob.cancelScheduledValues(0);
     gainKnob.setValueAtTime(0, 0);
-    let prevGain = 0;
     for (let {beat, gain} of timeline) {
       if (beat >= startingBeat) {
         let beatTime = currentTime + (beat - startingBeat) * secondsPerBeat;
-        let toneSmoothing = gain > prevGain ? toneSmoothingUp : toneSmoothingDown;
+        let toneSmoothing = gain > 0 ? toneSmoothingOn : toneSmoothingOff;
         gainKnob.setTargetAtTime(gain, beatTime, toneSmoothing);
-        prevGain = gain;
       }
     }
   });
@@ -75,13 +82,42 @@ function resize() {
   height = window.innerHeight;
   canvas.width = width;
   canvas.height = height;
+  draw();
 }
 
 function indexToFrequency(tone) {
-  console.assert(tone >= 0 && tone < toneCount);
   // 60: Middle C
   // 69: Concert A
   return 440 * 2 ** ((tone - 69) / 12);
+}
+
+function isBlackKey(key) {
+  return [1, 3, 6, 8, 10].some(x => key == x);
+}
+
+function draw() {
+  context.lineWidth = 2;
+  for (let {index, key} of tones) {
+    let y = height - ((index - toneScroll + 1) * toneHeight);
+
+    context.fillStyle = isBlackKey(key) ? '#ddd' : '#eee';
+    context.fillRect(0, y, width, toneHeight);
+
+    context.strokeStyle = 'black';
+    context.setLineDash([]);
+    context.strokeRect(0, y, toneWidth, toneHeight);
+    context.fillStyle = isBlackKey(key) ? 'black' : 'white';
+    context.fillRect(0, y, toneWidth, toneHeight);
+
+    if (key == 11 || key == 4) {
+      context.setLineDash(key == 4 ? [10, 10] : []);
+      context.strokeStyle = '#444';
+      context.beginPath();
+      context.moveTo(toneWidth, y);
+      context.lineTo(width, y);
+      context.stroke();
+    }
+  }
 }
 
 window.addEventListener('load', main);
