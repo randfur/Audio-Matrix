@@ -114,17 +114,13 @@ function draw() {
 
   // Tone separating lines
   for (let {index, key} of tones) {
-    let y = yForIndex(index);
-    let x = -beatScroll * beatWidth;
-    if (key == 11) {
-      context.setLineDash([]);
-      context.strokeStyle = '#444';
-      drawLine(x, y, width, y);
-    } else if (key == 4) {
-      context.setLineDash([8, 7]);
-      context.strokeStyle = '#999';
-      drawLine(x, y, width, y);
+    if (key != 11 && key != 4) {
+      continue;
     }
+    let y = yForIndex(index);
+    context.strokeStyle = '#999';
+    context.setLineDash(key == 11 ? [] : [8, 7]);
+    drawLine(-beatScroll * beatWidth, y, width, y);
   }
 
   // Beat separating lines
@@ -133,11 +129,11 @@ function draw() {
     let x = toneWidth + i * beatWidth;
     let isBar = (i + beatScroll) % 4 == 0;
     context.setLineDash([]);
-    context.strokeStyle = isBar ? '#999' : '#bbb';
+    context.strokeStyle = isBar ? '#444' : '#bbb';
     drawLine(x, 0, x, height);
   }
 
-  // Tone keyboard
+  // Keyboard
   for (let {index, key} of tones) {
     let y = yForIndex(index);
 
