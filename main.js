@@ -9,10 +9,9 @@ const toneCount = 128;
 const toneHeight = 14;
 const toneWidth = 100;
 let toneScroll = Math.round(60 - (height / 2 / toneHeight));
-const toneSmoothingOn = 0.01;
-const toneSmoothingOff = 0.04;
+const toneSmoothing = 0.05;
 
-let beatsPerMinute = 120;
+let beatsPerMinute = 160;
 let beatsPerBar = 4;
 const beatWidth = 50;
 let beatScroll = 0;
@@ -62,17 +61,16 @@ function range(n) {
   return result;
 }
 
-function scheduleToneGains({startingBeat, tone=null}) {
+function scheduleToneGains({startingBeat=0, tone=null}) {
   let currentTime = audioContext.currentTime;
   let secondsPerBeat = 60 / beatsPerMinute;
   let schedulingTones = tone ? [tone] : tones;
   schedulingTones.forEach(({gainKnob, timeline}) => {
     gainKnob.cancelScheduledValues(0);
-    gainKnob.setValueAtTime(0, 0);
+    gainKnob.setTargetAtTime(0, 0, toneSmoothing);
     for (let {beat, gain} of timeline) {
       if (beat >= startingBeat) {
         let beatTime = currentTime + (beat - startingBeat) * secondsPerBeat;
-        let toneSmoothing = gain > 0 ? toneSmoothingOn : toneSmoothingOff;
         gainKnob.setTargetAtTime(gain, beatTime, toneSmoothing);
       }
     }
@@ -177,12 +175,30 @@ function mouseUpEvent(event) {
 function mouseEvent({clientX:mouseX, clientY:mouseY}) {
   let hoverToneIndex = Math.min(toneCount - 1, Math.floor(((height - mouseY) / toneHeight) + toneScroll));
   if (mouseToneIndex != null && (!isMouseDown || mouseX > toneWidth || hoverToneIndex != mouseToneIndex)) {
-    tones[mouseToneIndex].gainKnob.setTargetAtTime(0, 0, toneSmoothingOff);
+    tones[mouseToneIndex].gainKnob.setTargetAtTime(0, 0, toneSmoothing);
     mouseToneIndex = null;
   }
   if (isMouseDown && mouseX <= toneWidth) {
     mouseToneIndex = hoverToneIndex;
-    tones[mouseToneIndex].gainKnob.setTargetAtTime(1, 0, toneSmoothingOn);
+    tones[mouseToneIndex].gainKnob.setTargetAtTime(1, 0, toneSmoothing);
+  }
+}
+
+function pickRandom(list) {
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function keyDownEvent({code}) {
+  if (code == 'Space') {
+    for (let tone of tones) {
+      tone.timeline = [];
+    }
+    for (let beat of range(8)) {
+      let index = pickRandom([48, 50, 52, 53, 55, 57, 59, 60]);
+      tones[index].timeline.push({beat, gain: 1});
+      tones[index].timeline.push({beat: beat + 1, gain: 0});
+    }
+    scheduleToneGains({});
   }
 }
 
@@ -192,3 +208,4 @@ window.addEventListener('mousewheel', scrollEvent);
 window.addEventListener('mousedown', mouseDownEvent);
 window.addEventListener('mousemove', mouseMoveEvent);
 window.addEventListener('mouseup', mouseUpEvent);
+window.addEventListener('keydown', keyDownEvent);
