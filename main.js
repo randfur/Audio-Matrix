@@ -43,8 +43,8 @@ const tones = range(toneCount).map(index => {
   };
 });
 
-let isMouseDown = false;
-let mouseToneIndex = null;
+let isPointerDown = false;
+let pointerToneIndex = null;
 
 
 function loadEvent() {
@@ -147,40 +147,40 @@ function draw() {
 }
 
 function scrollEvent(event) {
-  let {clientX:mouseX, deltaY} = event;
+  let {clientX:pointerX, deltaY} = event;
   deltaY /= Math.abs(deltaY);
-  if (mouseX <= toneWidth) {
+  if (pointerX <= toneWidth) {
     toneScroll = Math.max(0, Math.min(toneCount - (height / toneHeight), toneScroll - 3 * deltaY));
   } else {
     beatScroll = Math.max(0, beatScroll + deltaY);
   }
   draw();
-  mouseEvent(event);
+  pointerEvent(event);
 }
 
-function mouseDownEvent(event) {
-  isMouseDown = true;
-  mouseEvent(event);
+function pointerDownEvent(event) {
+  isPointerDown = true;
+  pointerEvent(event);
 }
 
-function mouseMoveEvent(event) {
-  mouseEvent(event);
+function pointerMoveEvent(event) {
+  pointerEvent(event);
 }
 
-function mouseUpEvent(event) {
-  isMouseDown = false;
-  mouseEvent(event);
+function pointerUpEvent(event) {
+  isPointerDown = false;
+  pointerEvent(event);
 }
 
-function mouseEvent({clientX:mouseX, clientY:mouseY}) {
-  let hoverToneIndex = Math.min(toneCount - 1, Math.floor(((height - mouseY) / toneHeight) + toneScroll));
-  if (mouseToneIndex != null && (!isMouseDown || mouseX > toneWidth || hoverToneIndex != mouseToneIndex)) {
-    tones[mouseToneIndex].gainKnob.setTargetAtTime(0, 0, toneSmoothing);
-    mouseToneIndex = null;
+function pointerEvent({clientX:pointerX, clientY:pointerY}) {
+  let hoverToneIndex = Math.min(toneCount - 1, Math.floor(((height - pointerY) / toneHeight) + toneScroll));
+  if (pointerToneIndex != null && (!isPointerDown || pointerX > toneWidth || hoverToneIndex != pointerToneIndex)) {
+    tones[pointerToneIndex].gainKnob.setTargetAtTime(0, 0, toneSmoothing);
+    pointerToneIndex = null;
   }
-  if (isMouseDown && mouseX <= toneWidth) {
-    mouseToneIndex = hoverToneIndex;
-    tones[mouseToneIndex].gainKnob.setTargetAtTime(1, 0, toneSmoothing);
+  if (isPointerDown && pointerX <= toneWidth) {
+    pointerToneIndex = hoverToneIndex;
+    tones[pointerToneIndex].gainKnob.setTargetAtTime(1, 0, toneSmoothing);
   }
 }
 
@@ -204,8 +204,8 @@ function keyDownEvent({code}) {
 
 window.addEventListener('load', loadEvent);
 window.addEventListener('resize', resizeEvent);
-window.addEventListener('mousewheel', scrollEvent);
-window.addEventListener('mousedown', mouseDownEvent);
-window.addEventListener('mousemove', mouseMoveEvent);
-window.addEventListener('mouseup', mouseUpEvent);
+window.addEventListener('pointerwheel', scrollEvent);
+window.addEventListener('pointerdown', pointerDownEvent);
+window.addEventListener('pointermove', pointerMoveEvent);
+window.addEventListener('pointerup', pointerUpEvent);
 window.addEventListener('keydown', keyDownEvent);
