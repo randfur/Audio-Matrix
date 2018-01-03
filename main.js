@@ -204,7 +204,7 @@ function keyDownEvent({code}) {
 
 window.addEventListener('load', loadEvent);
 window.addEventListener('resize', resizeEvent);
-window.addEventListener('pointerwheel', scrollEvent);
+window.addEventListener('mousewheel', scrollEvent);
 window.addEventListener('pointerdown', pointerDownEvent);
 window.addEventListener('pointermove', pointerMoveEvent);
 window.addEventListener('pointerup', pointerUpEvent);
