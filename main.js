@@ -2,31 +2,31 @@
 
 let canvas = null;
 let context = null;
-let width = 0;
-let height = 0;
+let width = window.innerWidth;
+let height = window.innerHeight;
 
-let toneCount = 128;
-let toneHeight = 14;
-let toneWidth = 100;
-let toneScroll = 0;
-let toneSmoothingOn = 0.01;
-let toneSmoothingOff = 0.04;
+const toneCount = 128;
+const toneHeight = 14;
+const toneWidth = 100;
+let toneScroll = Math.round(60 - (height / 2 / toneHeight));
+const toneSmoothingOn = 0.01;
+const toneSmoothingOff = 0.04;
 
 let beatsPerMinute = 120;
 let beatsPerBar = 4;
-let beatWidth = 50;
+const beatWidth = 50;
 let beatScroll = 0;
 
-let audioContext = new AudioContext();
+const audioContext = new AudioContext();
 
-let masterGainNode = (() => {
+const masterGainNode = (() => {
   let gain = audioContext.createGain();
   gain.gain.setValueAtTime(1, 0);
   gain.connect(audioContext.destination);
   return gain;
 })();
 
-let tones = range(toneCount).map(index => {
+const tones = range(toneCount).map(index => {
   let oscillator = audioContext.createOscillator();
   let frequency = indexToFrequency(index);
   oscillator.frequency.setValueAtTime(frequency, 0);
@@ -43,6 +43,9 @@ let tones = range(toneCount).map(index => {
     timeline: [],
   };
 });
+
+let isMouseDown = false;
+let mouseToneIndex = null;
 
 
 function loadEvent() {
@@ -79,6 +82,7 @@ function scheduleToneGains({startingBeat, tone=null}) {
 function resizeEvent() {
   width = window.innerWidth;
   height = window.innerHeight;
+  toneScroll = Math.max(0, Math.min(toneCount - (height / toneHeight), toneScroll));
   canvas.width = width;
   canvas.height = height;
   draw();
@@ -122,13 +126,13 @@ function draw() {
     context.setLineDash(key == 11 ? [] : [8, 7]);
     drawLine(-beatScroll * beatWidth, y, width, y);
   }
+  context.setLineDash([]);
 
   // Beat separating lines
   const visualBeatCount = Math.floor((width - toneWidth)/ beatWidth);
   for (let i of range(visualBeatCount)) {
     let x = toneWidth + i * beatWidth;
     let isBar = (i + beatScroll) % 4 == 0;
-    context.setLineDash([]);
     context.strokeStyle = isBar ? '#444' : '#bbb';
     drawLine(x, 0, x, height);
   }
@@ -138,14 +142,14 @@ function draw() {
     let y = yForIndex(index);
 
     context.strokeStyle = 'black';
-    context.setLineDash([]);
     context.strokeRect(0, y, toneWidth, toneHeight);
     context.fillStyle = isBlackKey(key) ? 'black' : 'white';
     context.fillRect(0, y, toneWidth, toneHeight);
   }
 }
 
-function scrollEvent({clientX:mouseX, deltaY}) {
+function scrollEvent(event) {
+  let {clientX:mouseX, deltaY} = event;
   deltaY /= Math.abs(deltaY);
   if (mouseX <= toneWidth) {
     toneScroll = Math.max(0, Math.min(toneCount - (height / toneHeight), toneScroll - 3 * deltaY));
@@ -153,8 +157,38 @@ function scrollEvent({clientX:mouseX, deltaY}) {
     beatScroll = Math.max(0, beatScroll + deltaY);
   }
   draw();
+  mouseEvent(event);
+}
+
+function mouseDownEvent(event) {
+  isMouseDown = true;
+  mouseEvent(event);
+}
+
+function mouseMoveEvent(event) {
+  mouseEvent(event);
+}
+
+function mouseUpEvent(event) {
+  isMouseDown = false;
+  mouseEvent(event);
+}
+
+function mouseEvent({clientX:mouseX, clientY:mouseY}) {
+  let hoverToneIndex = Math.min(toneCount - 1, Math.floor(((height - mouseY) / toneHeight) + toneScroll));
+  if (mouseToneIndex != null && (!isMouseDown || mouseX > toneWidth || hoverToneIndex != mouseToneIndex)) {
+    tones[mouseToneIndex].gainKnob.setTargetAtTime(0, 0, toneSmoothingOff);
+    mouseToneIndex = null;
+  }
+  if (isMouseDown && mouseX <= toneWidth) {
+    mouseToneIndex = hoverToneIndex;
+    tones[mouseToneIndex].gainKnob.setTargetAtTime(1, 0, toneSmoothingOn);
+  }
 }
 
 window.addEventListener('load', loadEvent);
 window.addEventListener('resize', resizeEvent);
 window.addEventListener('mousewheel', scrollEvent);
+window.addEventListener('mousedown', mouseDownEvent);
+window.addEventListener('mousemove', mouseMoveEvent);
+window.addEventListener('mouseup', mouseUpEvent);
