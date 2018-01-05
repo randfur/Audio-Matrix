@@ -28,6 +28,7 @@ const masterGainNode = (() => {
 const tones = range(toneCount).map(index => {
   let oscillator = audioContext.createOscillator();
   let frequency = indexToFrequency(index);
+  oscillator.type = 'triangle';
   oscillator.frequency.setValueAtTime(frequency, 0);
   oscillator.start(0);
   let gainNode = audioContext.createGain();
