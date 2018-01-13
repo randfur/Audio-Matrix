@@ -10,6 +10,7 @@ const toneHeight = 14;
 const toneWidth = 100;
 let toneScroll = Math.round(60 - (height / 2 / toneHeight));
 const toneSmoothing = 0.05;
+const toneGain = 0.125;
 
 let beatsPerMinute = 160;
 let beatsPerBar = 4;
@@ -66,13 +67,16 @@ function scheduleToneGains({startingBeat=0, tone=null}) {
   let currentTime = audioContext.currentTime;
   let secondsPerBeat = 60 / beatsPerMinute;
   let schedulingTones = tone ? [tone] : tones;
+  let timeForBeat = beat => currentTime + (beat - startingBeat) * secondsPerBeat;
   schedulingTones.forEach(({gainKnob, timeline}) => {
     gainKnob.cancelScheduledValues(0);
     gainKnob.setTargetAtTime(0, 0, toneSmoothing);
-    for (let {beat, gain} of timeline) {
+    for (let {beat, length} of timeline) {
       if (beat >= startingBeat) {
-        let beatTime = currentTime + (beat - startingBeat) * secondsPerBeat;
-        gainKnob.setTargetAtTime(gain, beatTime, toneSmoothing);
+        let onTime = timeForBeat(beat);
+        let offTime = timeForBeat(beat + length);
+        gainKnob.setTargetAtTime(toneGain, onTime, toneSmoothing);
+        gainKnob.setTargetAtTime(0, offTime, toneSmoothing);
       }
     }
   });
@@ -107,6 +111,7 @@ function drawLine(x1, y1, x2, y2) {
 function draw() {
   context.lineWidth = 2;
   let yForIndex = index => height - ((index - toneScroll + 1) * toneHeight);
+  let xForBeat = beat => toneWidth + (beat - beatScroll) * beatWidth;
 
   // Beat background
   for (let {index, key} of tones) {
@@ -128,12 +133,25 @@ function draw() {
   context.setLineDash([]);
 
   // Beat separating lines
-  const visualBeatCount = Math.floor((width - toneWidth)/ beatWidth);
+  const visualBeatCount = Math.floor((width - toneWidth) / beatWidth);
   for (let i of range(visualBeatCount)) {
-    let x = toneWidth + i * beatWidth;
+    let x = xForBeat(beatScroll + i);
     let isBar = (i + beatScroll) % 4 == 0;
     context.strokeStyle = isBar ? '#444' : '#bbb';
     drawLine(x, 0, x, height);
+  }
+
+  // Notes
+  context.fillStyle = 'black';
+  context.strokeStyle = 'grey';
+  for (let {index, timeline} of tones) {
+    let y = yForIndex(index);
+    for (let {beat, length} of timeline) {
+      let x = xForBeat(beat);
+      let noteWidth = xForBeat(beat + length) - x;
+      context.fillRect(x, y, noteWidth, toneHeight);
+      context.strokeRect(x, y, noteWidth, toneHeight);
+    }
   }
 
   // Keyboard
@@ -181,7 +199,7 @@ function pointerEvent({clientX:pointerX, clientY:pointerY}) {
   }
   if (isPointerDown && pointerX <= toneWidth) {
     pointerToneIndex = hoverToneIndex;
-    tones[pointerToneIndex].gainKnob.setTargetAtTime(1, 0, toneSmoothing);
+    tones[pointerToneIndex].gainKnob.setTargetAtTime(toneGain, 0, toneSmoothing);
   }
 }
 
@@ -196,10 +214,12 @@ function keyDownEvent({code}) {
     }
     for (let beat of range(8)) {
       let index = pickRandom([48, 50, 52, 53, 55, 57, 59, 60]);
-      tones[index].timeline.push({beat, gain: 1});
-      tones[index].timeline.push({beat: beat + 1, gain: 0});
+      tones[index].timeline.push({beat, gain: 1, length: 1});
+      // tones[index + 4].timeline.push({beat, gain: 1, length: 1});
+      tones[index + 7].timeline.push({beat, gain: 1, length: 1});
     }
     scheduleToneGains({});
+    draw();
   }
 }
 
