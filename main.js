@@ -16,6 +16,7 @@ let beatsPerMinute = 160;
 let beatsPerBar = 4;
 const beatWidth = 50;
 let beatScroll = 0;
+let quantum = 1 / 1;
 
 const audioContext = new AudioContext();
 
@@ -28,7 +29,7 @@ const masterGainNode = (() => {
 
 const tones = range(toneCount).map(index => {
   let oscillator = audioContext.createOscillator();
-  let frequency = indexToFrequency(index);
+  let frequency = frequencyForIndex(index);
   oscillator.type = 'triangle';
   oscillator.frequency.setValueAtTime(frequency, 0);
   oscillator.start(0);
@@ -51,6 +52,7 @@ let pointerToneIndex = null;
 
 function loadEvent() {
   canvas = document.getElementById('canvas');
+  canvas.addEventListener('contextmenu', event => event.preventDefault());
   context = canvas.getContext('2d');
   resizeEvent();
 }
@@ -63,7 +65,7 @@ function range(n) {
   return result;
 }
 
-function scheduleToneGains({startingBeat=0, tone=null}) {
+function scheduleToneGains(startingBeat=0, tone=null) {
   let currentTime = audioContext.currentTime;
   let secondsPerBeat = 60 / beatsPerMinute;
   let schedulingTones = tone ? [tone] : tones;
@@ -74,7 +76,7 @@ function scheduleToneGains({startingBeat=0, tone=null}) {
     for (let {beat, length} of timeline) {
       if (beat >= startingBeat) {
         let onTime = timeForBeat(beat);
-        let offTime = timeForBeat(beat + length);
+        let offTime = timeForBeat(beat + length) - toneSmoothing;
         gainKnob.setTargetAtTime(toneGain, onTime, toneSmoothing);
         gainKnob.setTargetAtTime(0, offTime, toneSmoothing);
       }
@@ -91,7 +93,23 @@ function resizeEvent() {
   draw();
 }
 
-function indexToFrequency(tone) {
+function yForIndex(index) {
+  return height - ((index - toneScroll + 1) * toneHeight);
+}
+
+function indexForY(y) {
+  return Math.min(toneCount - 1, Math.floor(((height - y) / toneHeight) + toneScroll));
+}
+
+function xForBeat(beat) {
+  return toneWidth + (beat - beatScroll) * beatWidth;
+}
+
+function beatForX(x) {
+  return Math.floor((x - toneWidth) / beatWidth / quantum) * quantum + beatScroll;
+}
+
+function frequencyForIndex(tone) {
   // 60: Middle C
   // 69: Concert A
   return 440 * 2 ** ((tone - 69) / 12);
@@ -110,8 +128,6 @@ function drawLine(x1, y1, x2, y2) {
 
 function draw() {
   context.lineWidth = 2;
-  let yForIndex = index => height - ((index - toneScroll + 1) * toneHeight);
-  let xForBeat = beat => toneWidth + (beat - beatScroll) * beatWidth;
 
   // Beat background
   for (let {index, key} of tones) {
@@ -133,7 +149,7 @@ function draw() {
   context.setLineDash([]);
 
   // Beat separating lines
-  const visualBeatCount = Math.floor((width - toneWidth) / beatWidth);
+  const visualBeatCount = Math.ceil((width - toneWidth) / beatWidth);
   for (let i of range(visualBeatCount)) {
     let x = xForBeat(beatScroll + i);
     let isBar = (i + beatScroll) % 4 == 0;
@@ -180,6 +196,11 @@ function scrollEvent(event) {
 function pointerDownEvent(event) {
   isPointerDown = true;
   pointerEvent(event);
+  if (event.button == 0) {
+    leftClickEvent(event);
+  } else if (event.button == 2) {
+    rightClickEvent(event);
+  }
 }
 
 function pointerMoveEvent(event) {
@@ -192,14 +213,41 @@ function pointerUpEvent(event) {
 }
 
 function pointerEvent({clientX:pointerX, clientY:pointerY}) {
-  let hoverToneIndex = Math.min(toneCount - 1, Math.floor(((height - pointerY) / toneHeight) + toneScroll));
-  if (pointerToneIndex != null && (!isPointerDown || pointerX > toneWidth || hoverToneIndex != pointerToneIndex)) {
+  let hoverIndex = indexForY(pointerY)
+  if (pointerToneIndex != null && (!isPointerDown || pointerX > toneWidth || hoverIndex != pointerToneIndex)) {
     tones[pointerToneIndex].gainKnob.setTargetAtTime(0, 0, toneSmoothing);
     pointerToneIndex = null;
   }
   if (isPointerDown && pointerX <= toneWidth) {
-    pointerToneIndex = hoverToneIndex;
+    pointerToneIndex = hoverIndex;
     tones[pointerToneIndex].gainKnob.setTargetAtTime(toneGain, 0, toneSmoothing);
+  }
+}
+
+function leftClickEvent({clientX:clickX, clientY:clickY}) {
+  if (clickX <= toneWidth) {
+    return;
+  }
+  let clickBeat = beatForX(clickX);
+  let clickIndex = indexForY(clickY);
+  tones[clickIndex].timeline.push({beat: clickBeat, length: quantum});
+  draw();
+}
+
+function rightClickEvent({clientX:clickX, clientY:clickY}) {
+  if (clickX <= toneWidth) {
+    return;
+  }
+  let clickBeat = beatForX(clickX);
+  let clickIndex = indexForY(clickY);
+  let timeline = tones[clickIndex].timeline;
+  for (let i = 0; i < timeline.length; ++i) {
+    let {beat, length} = timeline[i];
+    if (beat <= clickBeat && clickBeat < beat + length) {
+      timeline.splice(i, 1);
+      draw();
+      break;
+    }
   }
 }
 
@@ -209,24 +257,14 @@ function pickRandom(list) {
 
 function keyDownEvent({code}) {
   if (code == 'Space') {
-    for (let tone of tones) {
-      tone.timeline = [];
-    }
-    for (let beat of range(8)) {
-      let index = pickRandom([48, 50, 52, 53, 55, 57, 59, 60]);
-      tones[index].timeline.push({beat, gain: 1, length: 1});
-      // tones[index + 4].timeline.push({beat, gain: 1, length: 1});
-      tones[index + 7].timeline.push({beat, gain: 1, length: 1});
-    }
-    scheduleToneGains({});
-    draw();
+    scheduleToneGains(beatScroll);
   }
 }
 
 window.addEventListener('load', loadEvent);
 window.addEventListener('resize', resizeEvent);
+window.addEventListener('keydown', keyDownEvent);
 window.addEventListener('mousewheel', scrollEvent);
 window.addEventListener('pointerdown', pointerDownEvent);
 window.addEventListener('pointermove', pointerMoveEvent);
 window.addEventListener('pointerup', pointerUpEvent);
-window.addEventListener('keydown', keyDownEvent);
